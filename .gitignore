@@ -1,2 +1,17 @@
 data/
 venv/
+/app-flask/__pycache__
+app-flask/.DS_Store
+.DS_Store
+/files/images
+/files/temp/images
+/files/work/.cache
+/files/work/.ipynb_checkpoints
+/files/work/.ipython
+/files/work/.jupyter
+/files/work/.keras
+/files/work/.local
+/ollama-webui/cache
+/ollama-webui/vector_db
+/ollama/ollama-webui/cache
+/ollama/ollama/models

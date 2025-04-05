@@ -1,0 +1,98 @@
+services:
+
+  hackathon-flask-app:
+    container_name: hackathon-flask-app
+    build:
+      context: .
+      dockerfile: ./docker/flask/Dockerfile
+    ports:
+      - 5010:5010
+    volumes:
+      - ./app-flask:/app
+    environment:
+      - FLASK_APP=app.py
+    networks:
+      - hackathon-net
+
+  hackathon-mongo:
+    container_name: hackathon-mongo
+    image: mongo
+    ports:
+      - 37017:27017
+    volumes:
+      - "hackathon-mongodb:/var/lib/mongo/data"
+      - "$PWD/mongo-entrypoint/:/docker-entrypoint-initdb.d/"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: PassW0rd
+      MONGO_INITDB_DATABASE: db
+    networks:
+      - hackathon-net
+
+
+  hackathon-jupyter:
+    container_name: hackathon-jupyter
+    build: 
+      context: .
+      dockerfile: ./docker/jupyter/Dockerfile
+    volumes:
+      - ./files/work:/home/jovyan
+      - ~/Documents:/home/jovyan/Documents
+      - ~/Downloads:/home/jovyan/Downloads
+    ports:
+      - 8899:8888
+      - 8890:5001
+    depends_on:
+      - hackathon-mongo
+      - hackathon-flask-app
+    networks:
+      - hackathon-net
+    command: "start-notebook.sh --NotebookApp.token="
+
+  # hackathon-ollama:
+  #     image: ollama/ollama:latest
+  #     ports:
+  #         - 37869:11434
+  #     volumes:
+  #         - ./ollama/code:/code
+  #         - ./ollama/ollama:/root/.ollama
+  #     container_name: hackathon-ollama
+  #     pull_policy: always
+  #     tty: true
+  #     environment:
+  #         - OLLAMA_KEEP_ALIVE=24h
+  #         - OLLAMA_HOST=0.0.0.0
+  #     networks:
+  #         - hackathon-net
+
+
+  # hackathon-ollama-webui:
+  #     image: ghcr.io/open-webui/open-webui:main
+  #     container_name: hackathon-ollama-webui
+  #     volumes:
+  #         - ./ollama/ollama-webui:/app/backend/data
+  #     ports:
+  #         - 38080:8080
+  #     environment: # https://docs.openwebui.com/getting-started/env-configuration#default_models
+  #         - OLLAMA_BASE_URLS=http://host.docker.internal:37869 #comma separated ollama hosts
+  #         - ENV=dev
+  #         - WEBUI_AUTH=False
+  #         - WEBUI_NAME=HYPER AI
+  #         - WEBUI_URL=http://localhost:38080
+  #         - WEBUI_SECRET_KEY=t0p-s3cr3t
+  #         - OPENAI_API_KEY=temp-api-key
+  #     extra_hosts:
+  #         - host.docker.internal:host-gateway
+  #     depends_on:
+  #       - hackathon-ollama
+  #     networks:
+  #       - hackathon-net
+
+
+volumes:
+  hackathon-mongodb:
+    driver: local
+
+networks:
+  hackathon-net:
+    driver: bridge

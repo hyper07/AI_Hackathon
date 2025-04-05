@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form Input</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap/css/bootstrap.min.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1 class="mt-5">Enter Your Inputs</h1>
+        <form id="input-form">
+            <div class="form-group">
+                <label for="user_input1">Input 1:</label>
+                <input type="text" class="form-control" id="user_input1" name="user_input1" required>
+            </div>
+            <div class="form-group">
+                <label for="user_input2">Input 2:</label>
+                <input type="text" class="form-control" id="user_input2" name="user_input2" required>
+            </div>
+            <button type="button" class="btn btn-primary mt-3" id="get-random-number">Get Random Number</button>
+            <button type="button" class="btn btn-secondary mt-3" id="get-news">Get News</button>
+        </form>
+        <div id="results" class="mt-5" style="display: none;">
+            <h2>Results</h2>
+            <p>User Input 1: <span id="display-user-input1"></span></p>
+            <p>User Input 2: <span id="display-user-input2"></span></p>
+            <p>Random Number: <span id="display-random-number"></span></p>
+            <p>News List: <span id="display-news-list"></span></p>
+        </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('#get-random-number').on('click', function(event) {
+                event.preventDefault();
+                $.ajax({
+                    type: 'GET',
+                    url: '{{ url_for("random_number") }}',
+                    success: function(response) {
+                        $('#display-random-number').text(response.random_number);
+                        $('#results').show();
+                    },
+                    error: function(xhr, status, error) {
+                        alert('Error: ' + xhr.responseText);
+                    }
+                });
+            });
+
+            $('#get-news').on('click', function(event) {
+                event.preventDefault();
+                $.ajax({
+                    type: 'POST',
+                    url: '{{ url_for("get_news") }}',
+                    data: $('#input-form').serialize(),
+                    success: function(response) {
+                        $('#display-user-input1').text(response.user_input1);
+                        $('#display-user-input2').text(response.user_input2);
+                        let newsList = response.news_list.map(article => `<li>${article.title}</li>`).join('');
+                        $('#display-news-list').html(`<ul>${newsList}</ul>`);
+                        $('#results').show();
+                    },
+                    error: function(xhr, status, error) {
+                        alert('Error: ' + xhr.responseText);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
+

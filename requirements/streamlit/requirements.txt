@@ -1,0 +1,61 @@
+streamlit
+streamlit-aggrid
+streamlit_option_menu
+streamlit-feedback
+streamlit-tags
+st-pages
+click
+np_utils
+matplotlib
+pandas
+keras
+tensorflow
+graphviz
+xgboost
+catboost
+vecstack
+numpy
+
+plotly
+scikit-learn==1.2.2
+lightgbm
+openpyxl
+joblib
+# plotly==5.10.0
+# scikit-learn==1.2.2
+# lightgbm==4.4.0
+# openpyxl==3.1.5
+# joblib==1.4.2
+
+
+#For OpenAI
+openai
+duckduckgo-search
+anthropic
+trubrics
+chromadb
+langchain
+langchain-community
+langchain-core
+langchain-openai
+tiktoken
+sentence-transformers
+tf-keras
+ollama
+
+#“unstructured[md,pdf,pptx]”
+unstructured-client
+unstructured
+unstructured-inference
+unstructured.pytesseract
+urllib3
+python-dotenv
+panel
+ipython
+python-pptx
+pdf2image
+pdfminer
+opencv-python
+
+pikepdf
+pypdf
