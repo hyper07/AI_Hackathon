@@ -119,6 +119,7 @@ opendatasets
 # pandas
 keras
 tensorflow
+torchvision
 # graphviz
 # xgboost
 # catboost
