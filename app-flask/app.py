@@ -119,6 +119,11 @@ def form():
         return render_template('form.html', form_data=form_data, message="Form submitted successfully!")
     return render_template('form.html')
 
+@app.route('/background', methods=['GET'])
+def background():
+    return render_template('background.html')
+
+
 @app.route('/train/stop', methods=['POST'])
 def stop_training():
     stop_training_flag["stop"] = True
