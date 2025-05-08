@@ -1,5 +1,5 @@
-Flask==3.1.0
-Flask-Bootstrap==3.3.7.1
+Flask
+Flask-Bootstrap
 psycopg
 psycopg-binary
 aiofiles
@@ -114,12 +114,15 @@ wsproto
 xmltodict
 kaggle
 opendatasets
-# np_utils
-# matplotlib
-# pandas
+requests
+flask-sse
 keras
 tensorflow
 torchvision
+tf-keras
+np_utils
+IPython
+
 # graphviz
 # xgboost
 # catboost
@@ -139,7 +142,6 @@ torchvision
 # langchain-openai
 # tiktoken
 # sentence-transformers
-# tf-keras
 # ollama
 
 # unstructured-client
@@ -157,5 +159,4 @@ torchvision
 # pikepdf
 # pypdf
 
-requests
 

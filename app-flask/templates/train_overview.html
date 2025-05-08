@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Training Dataset Overview</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script>
+        let polling = false;
+        let lastStatus = "";
+        function startTraining() {
+            const progressDiv = document.getElementById('training-progress');
+            progressDiv.innerHTML = '';
+            lastStatus = "";
+            const btn = document.getElementById('start-training-btn');
+            const stopBtn = document.getElementById('stop-training-btn');
+            btn.disabled = true;
+            stopBtn.disabled = false;
+
+            fetch('/train', {method: 'POST'})
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === "started") {
+                        polling = true;
+                        pollProgress();
+                    } else {
+                        progressDiv.innerHTML = '<div>' + (data.message || 'Error starting training.') + '</div>';
+                        btn.disabled = false;
+                        stopBtn.disabled = true;
+                    }
+                })
+                .catch(() => {
+                    progressDiv.innerHTML = '<div>Error: Could not start training.</div>';
+                    btn.disabled = false;
+                    stopBtn.disabled = true;
+                });
+        }
+
+        function stopTraining() {
+            const stopBtn = document.getElementById('stop-training-btn');
+            stopBtn.disabled = true;
+            fetch('/train/stop', {method: 'POST'})
+                .then(response => response.json())
+                .then(data => {
+                    // Optionally show a message
+                });
+        }
+
+        function pollProgress() {
+            fetch('/train_status')
+                .then(response => response.json())
+                .then(data => {
+                    const progressDiv = document.getElementById('training-progress');
+                    let log = `Status: ${data.status}, Epoch: ${data.epoch}, Train Acc: ${data.train_acc}, Val Acc: ${data.val_acc}, Message: ${data.message}`;
+                    // Only update status summary if changed
+                    if (log !== lastStatus) {
+                        progressDiv.innerHTML = '<div><b>' + log + '</b></div>';
+                        lastStatus = log;
+                    }
+                    // Always update logs below
+                    if (data.logs && data.logs.length > 0) {
+                        progressDiv.innerHTML += '<pre style="font-size:12px;white-space:pre-wrap;">' + data.logs.join('') + '</pre>';
+                    }
+                    progressDiv.scrollTop = progressDiv.scrollHeight;
+                    const btn = document.getElementById('start-training-btn');
+                    const stopBtn = document.getElementById('stop-training-btn');
+                    if (data.status === "running") {
+                        btn.disabled = true;
+                        stopBtn.disabled = false;
+                        setTimeout(pollProgress, 1000);
+                    } else {
+                        btn.disabled = false;
+                        stopBtn.disabled = true;
+                    }
+                })
+                .catch(() => {
+                    const progressDiv = document.getElementById('training-progress');
+                    progressDiv.innerHTML += '<div>Error: Training stopped.</div>';
+                    document.getElementById('start-training-btn').disabled = false;
+                    document.getElementById('stop-training-btn').disabled = true;
+                });
+        }
+    </script>
+</head>
+<body>
+{% include '_headMenu.html' %}
+<div class="container mt-4">
+    <h2>Training Dataset Overview</h2>
+    <form method="get" style="display:inline;">
+        <button type="submit" class="btn btn-secondary mb-2">Refresh</button>
+    </form>
+    <button id="start-training-btn" onclick="startTraining()" class="btn btn-primary mb-2">Start Training</button>
+    <button id="stop-training-btn" onclick="stopTraining()" class="btn btn-danger mb-2" disabled>Stop Training</button>
+    {% if class_counts %}
+        <table class="table table-bordered mt-3">
+            <thead>
+                <tr>
+                    <th>Class Name</th>
+                    <th>Number of Images</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for class_name, count in class_counts.items() %}
+                <tr>
+                    <td>{{ class_name }}</td>
+                    <td>{{ count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="alert alert-warning mt-3">
+            No training data found in <code>./train_dataset</code>.
+        </div>
+    {% endif %}
+    <h4 class="mt-4">Training Progress</h4>
+    <div id="training-progress" class="border p-3" style="height: 200px; overflow-y: auto; background-color: #f8f9fa;"></div>
+</div>
+</body>
+</html>

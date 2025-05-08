@@ -1,5 +1,0 @@
-black
-mypy
-pre-commit
-watchdog
-pytest

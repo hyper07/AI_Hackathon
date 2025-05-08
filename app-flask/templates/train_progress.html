@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Training Progress</title>
+    <meta charset="utf-8">
+    <script>
+        function fetchProgress() {
+            fetch('/train/progress')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('status').innerText = data.status;
+                    document.getElementById('epoch').innerText = data.epoch + " / " + data.total_epochs;
+                    document.getElementById('train_acc').innerText = data.train_acc;
+                    document.getElementById('val_acc').innerText = data.val_acc;
+                    document.getElementById('message').innerText = data.message;
+                    if (data.status !== "done") {
+                        setTimeout(fetchProgress, 1000);
+                    }
+                });
+        }
+        window.onload = fetchProgress;
+    </script>
+</head>
+<body>
+    <h2>Training Progress</h2>
+    <p>Status: <span id="status">idle</span></p>
+    <p>Epoch: <span id="epoch">0 / 0</span></p>
+    <p>Train Accuracy: <span id="train_acc">0.0</span></p>
+    <p>Validation Accuracy: <span id="val_acc">0.0</span></p>
+    <p><span id="message"></span></p>
+</body>
+</html>
