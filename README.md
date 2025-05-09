@@ -14,6 +14,13 @@ This project demonstrates an end-to-end AI application for medical image classif
 
 ![Setting](files/images/settings.png)
 
+## Project Report (PDF)
+
+You can view the detailed project report or presentation by clicking the link below:
+
+[📄 View Project Report (PDF)](static/files/report.pdf)
+
+
 ## Project Overview
 
 This application was created as part of the **VOXEL51 & MongoDB AI Hackathon**. It enables users to upload wound images and receive automated wound type predictions using a trained deep learning model. The system stores image embeddings in MongoDB and utilizes **vector search** to efficiently retrieve the most similar cases, supporting explainable AI in medical diagnostics.
