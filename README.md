@@ -18,7 +18,7 @@ This project demonstrates an end-to-end AI application for medical image classif
 
 You can view the detailed project report or presentation by clicking the link below:
 
-[📄 View Project Report (PDF)](static/files/report.pdf)
+[📄 View Project Report (PDF)](static/files/Visual AI Hackathon.pdf)
 
 
 ## Project Overview
