@@ -15,6 +15,31 @@
         </div>
         <button type="submit" class="btn btn-primary">Upload</button>
     </form>
+
+    {% if prediction %}
+    <div class="mt-5">
+        <h4>Prediction Result</h4>
+        {% if prediction.uploaded_image_path %}
+        <div class="mb-3">
+            <strong>Uploaded Image:</strong><br>
+            <img src="{{ prediction.uploaded_image_path }}" alt="Uploaded Image" style="max-width:200px; max-height:200px; border:1px solid #ccc;">
+        </div>
+        {% endif %}
+        <h5>Top 5 Similar Images</h5>
+        <ul class="list-group">
+            {% for img in prediction.similar_images %}
+            <li class="list-group-item d-flex align-items-center">
+                <img src="{{ img.image_path }}" alt="Similar Image" style="width: 80px; height: 80px; object-fit: cover; margin-right: 15px;">
+                <div>
+                    <div><span>Score: {{ "%.4f"|format(img.score) }}</span></div>
+                    <div><span>Class Prediction: {{ img.label }}</span></div>
+                    <div><span>File Name: {{ img.image_path }}</span></div>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
 </div>
 </body>
 </html>

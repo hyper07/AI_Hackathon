@@ -2,6 +2,7 @@ import random
 import logging
 import os
 import requests  # Ensure this import is included
+import socket  # Add this import
 
 from flask import Flask, render_template, request, jsonify, Response  # Add Response
 from flask_bootstrap import Bootstrap
@@ -29,13 +30,12 @@ app.config['ENV'] = 'development'
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 Bootstrap(app)
 
-UPLOAD_FOLDER = './uploads'
+UPLOAD_FOLDER = './static/uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 MODEL_PATH = "./model/classification_model.keras"
-DATASET_PATH = "./train_dataset"
-MONGODB_URL = "mongodb://user:pass@hackathon-mongo:27017/"
+DATASET_PATH = "./static/train_dataset"
+MONGODB_URL = os.environ.get("MONGODB_URL", "mongodb://user:pass@hackathon-mongo:27017/")
 DEFAULT_DB_NAME = "hackathon"
-
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -77,12 +77,29 @@ def custom_generator(generator):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def check_mongo_hostname():
+    """
+    Checks if the MongoDB hostname can be resolved.
+    Returns None if ok, or an error string if not.
+    """
+    try:
+        # Extract hostname from MONGODB_URL
+        host = MONGODB_URL.split('@')[-1].split('/')[0].split(':')[0]
+        socket.gethostbyname(host)
+        return None
+    except Exception as e:
+        return f"MongoDB hostname '{host}' could not be resolved: {e}"
+
 def get_database():
     """
     Function to get MongoDB database connection.
     Uses consistent connection string and database name.
     """
-    # Ensure this connection string and DB name are correct for your setup.
+    # Check DNS resolution before connecting
+    dns_error = check_mongo_hostname()
+    if dns_error:
+        app.logger.error(dns_error)
+        return None
 
     try:
         client = MongoClient(MONGODB_URL)
@@ -340,10 +357,10 @@ def upload_and_predict():
     if request.method == 'GET':
         return render_template('upload.html')
     if 'file' not in request.files:
-        return jsonify({"error": "No file part"}), 400
+        return render_template('upload.html', prediction=None, error="No file part")
     file = request.files['file']
     if file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
+        return render_template('upload.html', prediction=None, error="No selected file")
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
@@ -365,17 +382,15 @@ def upload_and_predict():
         
         db = get_database()
         if db is None:
-            return jsonify({"error": "Database connection failed. Check logs."}), 500
+            return render_template('upload.html', prediction=None, error="Database connection failed. Check logs.")
         
-        # Ensure 'wounded' collection is intended for vector search and has 'vector_index'.
-        # The field 'feature_prediction' must exist in documents within this collection.
         collection = db['wounded'] 
         
         pipeline = [
             {
                 "$vectorSearch": {
-                    "index": "vector_index", # This index must exist on the 'wounded' collection.
-                    "path": "feature_prediction", # Field containing vectors in 'wounded' documents.
+                    "index": "vector_index",
+                    "path": "feature_prediction",
                     "queryVector": feature_vector,
                     "numCandidates": 100,
                     "limit": 5
@@ -383,31 +398,39 @@ def upload_and_predict():
             },
             {
                 "$project": {
-                    "image_path": 1, # Ensure 'wounded' documents have 'image_path'.
+                    "image_path": 1,
+                    "class_prediction": 1,
+                    "label": 1,
                     "score": {"$meta": "vectorSearchScore"}
                 }
             }
         ]
         try:
             results = list(collection.aggregate(pipeline))
-            similar_images = [{"image_path": doc["image_path"], "score": doc["score"]} for doc in results]
+            similar_images = [{"image_path": doc["image_path"], "score": doc["score"],"class_prediction": doc["class_prediction"], "label": doc["label"]} for doc in results]
         except Exception as e:
             app.logger.error(f"Error during vector search: {e}")
-            # This error might indicate the 'vector_index' is missing or not correctly configured.
-            return jsonify({"error": f"Vector search failed: {str(e)}. Ensure 'vector_index' is set up correctly on the '{collection.name}' collection for the 'feature_prediction' path."}), 500
+            return render_template('upload.html', prediction=None, error=f"Vector search failed: {str(e)}. Ensure 'vector_index' is set up correctly on the '{collection.name}' collection for the 'feature_prediction' path.")
 
-        return jsonify({
+        prediction = {
             "predicted_class": predicted_class,
             "predicted_label": predicted_label,
+            "uploaded_image_path": filepath,
             "similar_images": similar_images
-        })
+        }
+        return render_template('upload.html', prediction=prediction)
     else:
-        return jsonify({"error": "Invalid file type"}), 400
+        return render_template('upload.html', prediction=None, error="Invalid file type")
 
 @app.route('/settings', methods=['GET'])
 def settings():
     mongo_status = "Unknown"
     db_stats = {"collections": {}}
+    model_exists = os.path.exists(MODEL_PATH)
+    dns_error = check_mongo_hostname()
+    if dns_error:
+        mongo_status = f"DNS Error: {dns_error} (Check your MONGODB_URL: '{MONGODB_URL}')"
+        return render_template('settings.html', mongo_status=mongo_status, db_stats=db_stats, model_exists=model_exists)
     try:
         db = get_database() # Uses standardized connection and DB name
         if db is not None:
@@ -428,20 +451,26 @@ def settings():
         mongo_status = f"Error processing database stats: {str(e)}"
         app.logger.error(f"Error in settings route while fetching stats: {e}")
             
-    return render_template('settings.html', mongo_status=mongo_status, db_stats=db_stats)
+    return render_template('settings.html', mongo_status=mongo_status, db_stats=db_stats, model_exists=model_exists)
 
 @app.route('/initDB', methods=['GET'])
 def init_DB():
     # This function needs a direct client connection to drop/create the database.
 
     client = None
+    dns_error = check_mongo_hostname()
+    if dns_error:
+        training_progress["logs"].append(f"DNS Error: {dns_error}\n")
+        training_progress["status"] = "idle"
+        training_progress["message"] = f"DNS Error: {dns_error}"
+        return jsonify({"status": "error", "message": dns_error}), 500
     try:
         # Indicate DB init is starting in the logs/status
         training_progress["status"] = "db_init"
         training_progress["message"] = "Initializing database..."
         training_progress["logs"].append("Starting database initialization...\n")
 
-        client = MongoClient(MONGODB_URL, serverSelectionTimeoutMS=5000)
+        client = MongoClient(MONGODB_URL)
         client.admin.command('ping') # Check connection
         
         dbnames = client.list_database_names()
@@ -478,7 +507,7 @@ def init_DB():
                                 }
                                 collection.insert_one(doc)
                                 counter += 1
-                                msg = f"{counter} image nserted: {img_path}"
+                                msg = f"{counter} image inserted: {img_path}"
                                 print(msg)
                                 training_progress["logs"].append(msg + "\n")
                         
@@ -531,10 +560,18 @@ def init_DB():
         return jsonify({"status": "success", "message": f"Database '{DEFAULT_DB_NAME}' initialized. Collection '{collection.name}' created."})
     except Exception as e:
         app.logger.error(f"Error in init_DB: {e}")
-        training_progress["logs"].append(f"Error in init_DB: {e}\n")
+        # Add user-friendly hint for connection refused
+        error_message = str(e)
+        if "Connection refused" in error_message:
+            error_message += (
+                "\nHint: Connection was refused. "
+                "Please ensure your MongoDB container/service is running and accessible at the configured host/port. "
+                f"Current MONGODB_URL: '{MONGODB_URL}'"
+            )
+        training_progress["logs"].append(f"Error in init_DB: {error_message}\n")
         training_progress["status"] = "idle"
-        training_progress["message"] = f"Error in init_DB: {e}"
-        return jsonify({"status": "error", "message": str(e)}), 500
+        training_progress["message"] = f"Error in init_DB: {error_message}"
+        return jsonify({"status": "error", "message": error_message}), 500
     finally:
         if client:
             client.close()

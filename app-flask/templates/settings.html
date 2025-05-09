@@ -49,6 +49,14 @@
     <div id="resetStatus" class="mt-2"></div>
 </div>
 
+{% if not model_exists %}
+<div class="container mt-4">
+    <div class="alert alert-warning">
+        <strong>Model not found.</strong> Please train the model first to enable related features.
+    </div>
+</div>
+{% else %}
+
 <hr class="my-4">
 
 <div class="container mt-4">
@@ -95,12 +103,18 @@
         
         logsOutput.textContent = ''; // Clear any previous content
 
-        if (typeof(EventSource) !== "undefined") {
-            // Use a placeholder for the SSE endpoint URL, which you'll define in Flask
-            // For example, it could be url_for('stream_training_logs')
-            const eventSource = new EventSource("{{ url_for('stream_training_logs') }}"); 
-            // Note: You need to create the 'stream_training_logs' endpoint in your Flask app.
+        // Helper to escape HTML special characters
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
 
+        if (typeof(EventSource) !== "undefined") {
+            const eventSource = new EventSource("{{ url_for('stream_training_logs') }}"); 
             eventSource.onopen = function() {
                 logsStatusDiv.className = 'mt-2 alert alert-success';
                 logsStatusDiv.innerHTML = 'Connected to log stream. Waiting for logs...';
@@ -110,7 +124,8 @@
                 const data = JSON.parse(event.data);
 
                 if (data.type === 'log') {
-                    logsOutput.textContent += data.content + '\n';
+                    // Escape HTML and replace newlines with <br> for better formatting
+                    logsOutput.innerHTML += escapeHtml(data.content) + '<br>';
                     logsOutput.scrollTop = logsOutput.scrollHeight; // Auto-scroll
                 } else if (data.type === 'status') {
                     let statusMessage = `Status: ${data.status_text || 'N/A'}`;
@@ -123,7 +138,7 @@
                     logsStatusDiv.className = 'mt-2 alert alert-info'; // Or other classes based on status
                     logsStatusDiv.innerHTML = statusMessage;
                 } else if (data.type === 'error_message') {
-                    logsOutput.textContent += `ERROR: ${data.content}\n`;
+                    logsOutput.innerHTML += '<span class="text-danger">ERROR: ' + escapeHtml(data.content) + '</span><br>';
                     logsOutput.scrollTop = logsOutput.scrollHeight;
                     logsStatusDiv.className = 'mt-2 alert alert-warning';
                     logsStatusDiv.innerHTML = `Received an error message from the stream.`;
@@ -153,5 +168,8 @@
         }
     });
 </script>
+
+{% endif %}
+
 </body>
 </html>

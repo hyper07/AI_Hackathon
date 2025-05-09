@@ -6,9 +6,15 @@ This project is an implementation of a stack based on Docker (docker-compose) us
 
 ![Application](files/images/main.png)
 
+![Training](files/images/training.png)
+
+![Prediction](files/images/prediction.png)
+
+![Setting](files/images/settings.png)
+
 ## Features
 
-- **MongoDB**: NoSQL database
+- **MongoDB**: MongoDB Atlas local
 - **Flask**: Micro web framework for Python
 - **Jupyter**: Interactive computing environment
 
@@ -45,10 +51,6 @@ docker-compose down
 ### Flask App
 
 - **Web Interface**: [http://localhost:5010](http://localhost:5010)
-
-
-# HOW TO ACCESS DATABASE AND API
-For detailed instructions on how to access and interact with the databases
 
 
 ## Dataset

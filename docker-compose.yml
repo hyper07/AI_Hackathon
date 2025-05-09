@@ -9,7 +9,7 @@ services:
       - 5010:5010
     volumes:
       - ./app-flask:/app
-      - ./files/work/train_dataset:/app/train_dataset
+      - ./files/work/train_dataset:/app/static/train_dataset
     environment:
       - FLASK_APP=app.py
     networks:
@@ -27,6 +27,10 @@ services:
     environment:
       MONGODB_INITDB_ROOT_USERNAME: user
       MONGODB_INITDB_ROOT_PASSWORD: pass
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: PassW0rd
+      # Comment out or remove keyfile-related config unless you intend to use it
+      # MONGO_INITDB_KEYFILE: /data/configdb/keyfile
     networks:
       - hackathon-net
 
@@ -52,9 +56,7 @@ services:
 
 volumes:
   hackathon-mongodb:
-    driver: local
   hackathon-mongot:
-    driver: local
 
 networks:
   hackathon-net:
