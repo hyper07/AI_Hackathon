@@ -1,5 +1,7 @@
 # AI Hackathon: Wound Image Classification with MongoDB Vector Search
 
+> **Developed for the VOXEL51 & MongoDB AI Hackathon**
+
 This project demonstrates an end-to-end AI application for medical image classification, leveraging **MongoDB's vector search** to identify wound types from images. The stack is containerized using Docker Compose and integrates **Flask**, **Jupyter**, and **MongoDB** for scalable, reproducible development and deployment.
 
 ![AI Hackathon](files/images/AI_Hackathon.png)
@@ -14,7 +16,7 @@ This project demonstrates an end-to-end AI application for medical image classif
 
 ## Project Overview
 
-This application enables users to upload wound images and receive automated wound type predictions using a trained deep learning model. The system stores image embeddings in MongoDB and utilizes **vector search** to efficiently retrieve the most similar cases, supporting explainable AI in medical diagnostics.
+This application was created as part of the **VOXEL51 & MongoDB AI Hackathon**. It enables users to upload wound images and receive automated wound type predictions using a trained deep learning model. The system stores image embeddings in MongoDB and utilizes **vector search** to efficiently retrieve the most similar cases, supporting explainable AI in medical diagnostics.
 
 **Key Features:**
 - **Wound Image Classification:** Predicts wound types from uploaded images using a trained neural network.
