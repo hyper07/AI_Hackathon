@@ -18,7 +18,7 @@ This project demonstrates an end-to-end AI application for medical image classif
 
 You can view the detailed project report or presentation by clicking the link below:
 
-[📄 View Project Report (PDF)](static/files/AI_Hackathon.pdf)
+[📄 View Project Report (PDF)](app-flask/static/files/AI_Hackathon.pdf)
 
 
 ## Project Overview
