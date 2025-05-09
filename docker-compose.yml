@@ -22,6 +22,7 @@ services:
       - 37017:27017
     volumes:
       - hackathon-mongodb:/data/db
+      - hackathon-mongot:/data/mongot
       # - ./config:/data/configdb
     environment:
       MONGODB_INITDB_ROOT_USERNAME: user
@@ -51,6 +52,8 @@ services:
 
 volumes:
   hackathon-mongodb:
+    driver: local
+  hackathon-mongot:
     driver: local
 
 networks:

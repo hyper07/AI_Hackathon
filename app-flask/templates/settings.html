@@ -49,6 +49,15 @@
     <div id="resetStatus" class="mt-2"></div>
 </div>
 
+<hr class="my-4">
+
+<div class="container mt-4">
+    <h4>Logs</h4>
+    <p>View logs from the last training session, including image insertion status if applicable. Logs will stream in real-time if a training session is active or has recently completed.</p>
+    <div id="trainingLogsStatus" class="mt-2 alert alert-info">Connecting to log stream...</div>
+    <pre id="trainingLogsOutput" class="bg-light p-3 border rounded" style="max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;"></pre>
+</div>
+
 <script>
     document.getElementById('resetDbForm').addEventListener('submit', function(event) {
         event.preventDefault(); // Prevent default form submission
@@ -77,6 +86,71 @@
             console.error('Error:', error);
             statusDiv.innerHTML = `<div class="alert alert-danger">An unexpected error occurred. Check console.</div>`;
         });
+    });
+
+    // Script for streaming training logs
+    document.addEventListener('DOMContentLoaded', function() {
+        const logsOutput = document.getElementById('trainingLogsOutput');
+        const logsStatusDiv = document.getElementById('trainingLogsStatus');
+        
+        logsOutput.textContent = ''; // Clear any previous content
+
+        if (typeof(EventSource) !== "undefined") {
+            // Use a placeholder for the SSE endpoint URL, which you'll define in Flask
+            // For example, it could be url_for('stream_training_logs')
+            const eventSource = new EventSource("{{ url_for('stream_training_logs') }}"); 
+            // Note: You need to create the 'stream_training_logs' endpoint in your Flask app.
+
+            eventSource.onopen = function() {
+                logsStatusDiv.className = 'mt-2 alert alert-success';
+                logsStatusDiv.innerHTML = 'Connected to log stream. Waiting for logs...';
+            };
+
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+
+                if (data.type === 'log') {
+                    logsOutput.textContent += data.content + '\n';
+                    logsOutput.scrollTop = logsOutput.scrollHeight; // Auto-scroll
+                } else if (data.type === 'status') {
+                    let statusMessage = `Status: ${data.status_text || 'N/A'}`;
+                    if (data.epoch !== undefined && data.total_epochs !== undefined) {
+                        statusMessage += ` (Epoch: ${data.epoch}/${data.total_epochs})`;
+                    }
+                    if (data.message) {
+                        statusMessage += `<br>Message: ${data.message}`;
+                    }
+                    logsStatusDiv.className = 'mt-2 alert alert-info'; // Or other classes based on status
+                    logsStatusDiv.innerHTML = statusMessage;
+                } else if (data.type === 'error_message') {
+                    logsOutput.textContent += `ERROR: ${data.content}\n`;
+                    logsOutput.scrollTop = logsOutput.scrollHeight;
+                    logsStatusDiv.className = 'mt-2 alert alert-warning';
+                    logsStatusDiv.innerHTML = `Received an error message from the stream.`;
+                } else if (data.type === 'complete') {
+                    logsStatusDiv.className = 'mt-2 alert alert-success';
+                    logsStatusDiv.innerHTML = `Log stream complete: ${data.message || 'Training finished.'}`;
+                    eventSource.close(); // Close connection if server signals completion
+                }
+            };
+
+            eventSource.onerror = function(err) {
+                console.error("EventSource failed:", err);
+                logsStatusDiv.className = 'mt-2 alert alert-danger';
+                if (eventSource.readyState === EventSource.CLOSED) {
+                    logsStatusDiv.innerHTML = 'Log stream connection was closed by the server.';
+                } else {
+                    logsStatusDiv.innerHTML = 'Error connecting to log stream. Will attempt to reconnect if server becomes available.';
+                }
+                // EventSource will automatically try to reconnect.
+                // If you want to stop retrying, you can call eventSource.close() here under certain conditions.
+            };
+
+        } else {
+            logsStatusDiv.className = 'mt-2 alert alert-warning';
+            logsStatusDiv.innerHTML = "Your browser does not support Server-Sent Events. Cannot stream logs.";
+            logsOutput.textContent = "Streaming not supported.";
+        }
     });
 </script>
 </body>

@@ -3,7 +3,7 @@ import logging
 import os
 import requests  # Ensure this import is included
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response  # Add Response
 from flask_bootstrap import Bootstrap
 from IPython.display import display, Image as IPImage
 from PIL import Image
@@ -22,6 +22,7 @@ import time
 from tensorflow.keras.callbacks import Callback
 import io
 import sys
+import json  # Add json
 
 app = Flask(__name__)
 app.config['ENV'] = 'development'
@@ -32,6 +33,9 @@ UPLOAD_FOLDER = './uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 MODEL_PATH = "./model/classification_model.keras"
 DATASET_PATH = "./train_dataset"
+MONGODB_URL = "mongodb://user:pass@hackathon-mongo:27017/"
+DEFAULT_DB_NAME = "hackathon"
+
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -79,16 +83,17 @@ def get_database():
     Uses consistent connection string and database name.
     """
     # Ensure this connection string and DB name are correct for your setup.
-    CONNECTION_STRING = "mongodb://user:pass@hackathon-mongo:27017/"
-    DB_NAME = "hackathon"
+
     try:
-        client = MongoClient(CONNECTION_STRING, serverSelectionTimeoutMS=5000)
+        client = MongoClient(MONGODB_URL)
         # Ping to confirm connection
         client.admin.command('ping')
+        dbnames = client.list_database_names()
+        app.logger.info(f"MongoDB ('{client.list_database_names()}'")
         # Return the specific database
-        return client[DB_NAME]
+        return client[DEFAULT_DB_NAME]
     except Exception as e:
-        app.logger.error(f"Failed to connect to MongoDB ('{DB_NAME}' at '{CONNECTION_STRING}'): {e}")
+        app.logger.error(f"Failed to connect to MongoDB ('{DEFAULT_DB_NAME}' at '{MONGODB_URL}'): {e}")
         return None
 
 def get_predictions(model, test_image_path):
@@ -148,6 +153,7 @@ def train_model():
             return jsonify({"status": "error", "message": "Training already running."}), 400
         training_progress["status"] = "running"
         training_progress["epoch"] = 0
+        training_progress["total_epochs"] = 20  # Set to the number of epochs train_model_background will run
         training_progress["train_acc"] = 0.0
         training_progress["val_acc"] = 0.0
         training_progress["message"] = "Training started."
@@ -164,7 +170,59 @@ def train_status():
     logs = training_progress.get("logs", [])
     return jsonify({**training_progress, "logs": logs[-50:]})
 
-def train_model_background(total_epochs=1):
+@app.route('/stream-training-logs')
+def stream_training_logs():
+    def event_stream():
+        last_log_index = 0
+        last_status = None
+
+        # Send initial status
+        status_data = {
+            "type": "status",
+            "status_text": training_progress.get("status"),
+            "epoch": training_progress.get("epoch"),
+            "total_epochs": training_progress.get("total_epochs"),
+            "message": training_progress.get("message")
+        }
+        yield f"data: {json.dumps(status_data)}\n\n"
+        last_status = json.dumps(status_data, sort_keys=True)
+
+        while True:
+            # Send new logs
+            logs = training_progress.get("logs", [])
+            while last_log_index < len(logs):
+                log_entry = logs[last_log_index].rstrip('\n')
+                log_data = {"type": "log", "content": log_entry}
+                yield f"data: {json.dumps(log_data)}\n\n"
+                last_log_index += 1
+
+            # Send status update if changed
+            status_data = {
+                "type": "status",
+                "status_text": training_progress.get("status"),
+                "epoch": training_progress.get("epoch"),
+                "total_epochs": training_progress.get("total_epochs"),
+                "message": training_progress.get("message")
+            }
+            status_json = json.dumps(status_data, sort_keys=True)
+            if status_json != last_status:
+                yield f"data: {json.dumps(status_data)}\n\n"
+                last_status = status_json
+
+            # If training is done, stopped, or error, send complete and break
+            if training_progress.get("status") in ["done", "stopped", "error"]:
+                if training_progress.get("status") == "error":
+                    error_data = {"type": "error_message", "content": training_progress.get("message", "")}
+                    yield f"data: {json.dumps(error_data)}\n\n"
+                complete_data = {"type": "complete", "message": training_progress.get("message", "")}
+                yield f"data: {json.dumps(complete_data)}\n\n"
+                break
+
+            time.sleep(1)
+
+    return Response(event_stream(), mimetype="text/event-stream")
+
+def train_model_background(total_epochs=20):
     global training_progress
     img_height, img_width = 256, 256
     batch_size = 32
@@ -258,37 +316,7 @@ def train_model_background(total_epochs=1):
             sys.stdout, sys.stderr = old_stdout, old_stderr
             return # Exit the thread
         
-        # Ensure 'wounded' collection is intended for vector search and has 'vector_index'.
-        collection = db['wounded'] 
-        # Loop through labeled folders
-        for label in os.listdir(DATASET_PATH):
-            label_dir = os.path.join(DATASET_PATH, label)
-            if os.path.isdir(label_dir):
-                for img_file in os.listdir(label_dir):
-                    img_path = os.path.join(label_dir, img_file)
-                    if img_file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                        try:
-                            with Image.open(img_path).convert("RGB") as img:
-                                width, height = img.size
-                                predictions = get_predictions(model, img_path)
-
-                                # Convert numpy arrays to lists for JSON serialization
-                                class_prediction = predictions['class'].tolist() if isinstance(predictions['class'], np.ndarray) else predictions['class']
-                                feature_prediction = predictions['feature'].tolist() if isinstance(predictions['feature'], np.ndarray) else predictions['feature']
-
-                                doc = {
-                                    "image_path": img_path,
-                                    "label": label,
-                                    "width": width,
-                                    "height": height,
-                                    "class_prediction": class_prediction,
-                                    "feature_prediction": feature_prediction
-                                }
-
-                                collection.insert_one(doc)
-                                print(f"Inserted: {img_path}")
-                        except Exception as e:
-                            print(f"Failed to process {img_path}: {e}")
+        
 
 
 
@@ -382,7 +410,7 @@ def settings():
     db_stats = {"collections": {}}
     try:
         db = get_database() # Uses standardized connection and DB name
-        if db:
+        if db is not None:
             mongo_status = f"Connected. Database '{db.name}' is accessible."
             collection_names = db.list_collection_names()
             if not collection_names:
@@ -405,43 +433,107 @@ def settings():
 @app.route('/initDB', methods=['GET'])
 def init_DB():
     # This function needs a direct client connection to drop/create the database.
-    CONNECTION_STRING = "mongodb://user:pass@hackathon-mongo:27017/" 
-    DB_NAME = "hackathon" 
+
     client = None
     try:
-        client = MongoClient(CONNECTION_STRING, serverSelectionTimeoutMS=5000)
+        # Indicate DB init is starting in the logs/status
+        training_progress["status"] = "db_init"
+        training_progress["message"] = "Initializing database..."
+        training_progress["logs"].append("Starting database initialization...\n")
+
+        client = MongoClient(MONGODB_URL, serverSelectionTimeoutMS=5000)
         client.admin.command('ping') # Check connection
         
         dbnames = client.list_database_names()
-        if DB_NAME in dbnames:
-            client.drop_database(DB_NAME)
-            app.logger.info(f"Dropped database: {DB_NAME}")
+        if DEFAULT_DB_NAME in dbnames:
+            client.drop_database(DEFAULT_DB_NAME)
+            msg = f"Dropped database: {DEFAULT_DB_NAME}"
+            app.logger.info(msg)
+            training_progress["logs"].append(msg + "\n")
         
-        db = client[DB_NAME]
-        # Create 'wounded' collection (or any other essential collections)
-        wounded_collection = db['wounded']
-        # Insert a sample document to ensure collection creation and provide info
-        wounded_collection.insert_one({
-            "init": True, 
-            "message": "This is the 'wounded' collection. Ensure 'feature_prediction' field and 'vector_index' are set up if used for search.",
-            "image_path": "example/initial_image.jpg", # Example field
-            "feature_prediction": [0.0] * 2048 # Example placeholder for a feature vector
-        })
-        app.logger.info(f"Initialized database '{DB_NAME}' and collection '{wounded_collection.name}'.")
-        
-        # IMPORTANT: Vector index creation (e.g., for $vectorSearch)
-        # The index named "vector_index" on the "feature_prediction" path
-        # needs to be created on your MongoDB deployment (e.g., via Atlas UI, Atlas API, or specific admin commands).
-        # Pymongo's `create_index` is typically not used for these advanced search indexes.
-        # Example: db.adminCommand({
-        #   "createSearchIndexes": "wounded",
-        #   "indexes": [{ "name": "vector_index", "definition": { "mappings": { "dynamic": True, "fields": { "feature_prediction": { "type": "knnVector", "dimensions": 2048, "similarity": "cosine"}}}}}]
-        # }) - This is an Atlas Search specific command. Syntax varies.
-        app.logger.info("Remember to manually create the 'vector_index' for $vectorSearch if not already present.")
+        db = client[DEFAULT_DB_NAME]
+        collection = db['wounded']
+        model = load_model(MODEL_PATH)
+        collection = db['wounded']
+        counter = 0
+        for label in os.listdir(DATASET_PATH):
+            label_dir = os.path.join(DATASET_PATH, label)
+            if os.path.isdir(label_dir):
+                for img_file in os.listdir(label_dir):
+                    img_path = os.path.join(label_dir, img_file)
+                    if img_file.lower().endswith(('.png', '.jpg', '.jpeg')):
+                        try:
+                            with Image.open(img_path).convert("RGB") as img:
+                                width, height = img.size
+                                predictions = get_predictions(model, img_path)
+                                class_prediction = predictions['class'].tolist() if isinstance(predictions['class'], np.ndarray) else predictions['class']
+                                feature_prediction = predictions['feature'].tolist() if isinstance(predictions['feature'], np.ndarray) else predictions['feature']
+                                doc = {
+                                    "image_path": img_path,
+                                    "label": label,
+                                    "width": width,
+                                    "height": height,
+                                    "class_prediction": class_prediction,
+                                    "feature_prediction": feature_prediction
+                                }
+                                collection.insert_one(doc)
+                                counter += 1
+                                msg = f"{counter} image nserted: {img_path}"
+                                print(msg)
+                                training_progress["logs"].append(msg + "\n")
+                        
+                        except Exception as e:
+                            msg = f"Failed to process {img_path}: {e}"
+                            print(msg)
+                            training_progress["logs"].append(msg + "\n")
+                                
+        print(f"Total {counter} images are inserted")
 
-        return jsonify({"status": "success", "message": f"Database '{DB_NAME}' initialized. Collection '{wounded_collection.name}' created."})
+        # Create the vector index for the collection using db.command (Atlas Search)
+        try:
+            index_command = {
+                "createSearchIndexes": "wounded",
+                "indexes": [
+                    {
+                        "name": "vector_index",
+                        "definition": {
+                            "mappings": {
+                                "dynamic": False,
+                                "fields": {
+                                    "feature_prediction": {
+                                        "type": "knnVector",
+                                        "dimensions": 2048,
+                                        "similarity": "cosine"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ]
+            }
+            db.command(index_command)
+            msg = "Atlas Search vector index 'vector_index' created on 'feature_prediction' field."
+            app.logger.info(msg)
+            training_progress["logs"].append(msg + "\n")
+        except Exception as e:
+            msg = (
+                f"Failed to create Atlas Search vector index automatically: {e}\n"
+                "You may need to create the index manually in the Atlas UI or via the Atlas API."
+            )
+            app.logger.warning(msg)
+            training_progress["logs"].append(msg + "\n")
+        
+        app.logger.info("Remember to manually create the 'vector_index' for $vectorSearch if not already present.")
+        training_progress["logs"].append("Database initialization complete.\n")
+        training_progress["status"] = "idle"
+        training_progress["message"] = "Database initialization complete."
+
+        return jsonify({"status": "success", "message": f"Database '{DEFAULT_DB_NAME}' initialized. Collection '{collection.name}' created."})
     except Exception as e:
         app.logger.error(f"Error in init_DB: {e}")
+        training_progress["logs"].append(f"Error in init_DB: {e}\n")
+        training_progress["status"] = "idle"
+        training_progress["message"] = f"Error in init_DB: {e}"
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         if client:

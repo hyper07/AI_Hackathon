@@ -2,6 +2,12 @@
 
 This project is an implementation of a stack based on Docker (docker-compose) using MongoDB, Flask, Jupyter.
 
+
+![AI Hackathon](./files/images/AI_Hackathon.png)
+
+
+![Application](./files/images/main.png)
+
 ## Features
 
 - **MongoDB**: NoSQL database
@@ -31,9 +37,8 @@ docker-compose down
 - **Connection String**:
   ```python
   from pymongo import MongoClient
-  client = MongoClient('mongodb://admin:PassW0rd@apan-mongo:27017/')
+  client = MongoClient('mongodb://user:pass@hackathon-mongo:27017/')
   ```
-
 
 ### Jupyter
 
@@ -42,14 +47,10 @@ docker-compose down
 ### Flask App
 
 - **Web Interface**: [http://localhost:5010](http://localhost:5010)
-- **Web Sample Form**: [http://localhost:5010/form](http://localhost:5010/form)
 
 
 # HOW TO ACCESS DATABASE AND API
 For detailed instructions on how to access and interact with the databases
-
-- **How to access dbs**: [How To Access](https://github.com/hyper07/AI_Hackathon/blob/main/files/work/HowToUse.md).
-
 
 
 ## Dataset
