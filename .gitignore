@@ -3,7 +3,6 @@ venv/
 /app-flask/__pycache__
 app-flask/.DS_Store
 .DS_Store
-/files/images
 /files/temp/images
 /files/work/.cache
 /files/work/.ipynb_checkpoints
