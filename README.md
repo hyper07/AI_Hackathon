@@ -2,11 +2,9 @@
 
 This project is an implementation of a stack based on Docker (docker-compose) using MongoDB, Flask, Jupyter.
 
+![AI Hackathon](files/images/AI_Hackathon.png)
 
-![AI Hackathon](./files/images/AI_Hackathon.png)
-
-
-![Application](./files/images/main.png)
+![Application](files/images/main.png)
 
 ## Features
 
